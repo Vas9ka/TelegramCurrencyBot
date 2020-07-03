@@ -1,23 +1,26 @@
 import requests
-import xml.etree.ElementTree as ET
+from bs4 import BeautifulSoup
 import re
-class CentralBank:
-    URL = 'http://www.cbr.ru/scripts/XML_daily.asp?'
+import Logs
+def GetCurrency(currency, date = None):
+    newcurr = "(" + currency + ")"
+    URL = "https://ru.myfin.by/currency/cb-rf"
+    if date:
+        URL += "/" + date
+    request = requests.get(URL).text
+    soup = BeautifulSoup(request)
+    find = False
+    result = ""
+    try:
+        result += soup.h1.text  + " " + newcurr + "\n"
+        for tag in soup.find('tbody').find_all('td'):
+            if re.findall(newcurr,tag.text):
+                find  = True
+                continue
+            if find:
+                result += tag.text + " руб."
+                return result
+    except AttributeError:
+        Logs.log_exception(AttributeError)
+        return "Прости, мне ничего не удалось найти :("
 
-    def load_exchange(self):
-        root  = ET.fromstring(requests.get(self.URL).text)
-        currencies = {}
-        for i in range(len(root)):
-           currencies[root[i][1].text] = str(float(root[i][4].text.replace(',','.')) / float(root[i][2].text))
-        return currencies
-
-    def get_exchange(self,currency):
-        return self.load_exchange()[currency]
-    def get_exchanges(self,ccy_pattern):  
-        result = {}
-        ccy_pattern = re.escape(ccy_pattern) + '.*' 
-        currencies = self.load_exchange() 
-        for exc in currencies:  
-            if re.match(ccy_pattern, exc, re.IGNORECASE) is not None:
-                result[exc] = currencies[exc]
-        return result
